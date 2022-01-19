@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sp-namespace-allow-networkpolicy
+  namespace: test
+spec:
+  podSelector:
+    matchLabels:
+      app: pod3
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          ns: default
+    ports:
+    - protocol: TCP
+      port: 80
