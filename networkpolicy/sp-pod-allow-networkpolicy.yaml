@@ -2,6 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: sp-pod-allow-networkpolicy
+  namespace: default
 spec:
   podSelector:
     matchLabels:
