@@ -1,0 +1,19 @@
+kind: ConstraintTemplate
+metadata:
+  name: notlatestimage
+spec:
+  crd:
+    spec:
+      names:
+        kind: NotLatestImage
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package notlatestimage
+
+        violation[{"msg": msg}]{
+          input.review.object.kind == "Pod"
+          imagetag := input.review.object.spec.containers[_].image
+          endswith(imagetag,"latest")
+          msg := "Can't use image of latest tag !!"
+        }

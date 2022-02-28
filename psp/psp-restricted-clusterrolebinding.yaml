@@ -1,0 +1,15 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: "2022-02-17T06:29:28Z"
+  name: psp-restricted
+  resourceVersion: "1300880"
+  uid: 57398960-19c1-41fa-a0b2-e393eb69c0ea
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: psp-restricted
+subjects:
+- kind: ServiceAccount
+  name: psp-user
+  namespace: default

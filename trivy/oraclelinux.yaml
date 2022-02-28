@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: oraclelinux
+spec:
+  containers:
+    - name: oraclelinux
+      image: oraclelinux:8.5
+      command:
+        - sleep
+        - infinity

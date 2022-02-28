@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: "2022-02-17T06:27:14Z"
+  name: psp-restricted
+  resourceVersion: "1300573"
+  uid: f1b7f4c6-2437-43c0-a15c-3bb55ba59098
+rules:
+- apiGroups:
+  - policy
+  resourceNames:
+  - restricted-psp
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use

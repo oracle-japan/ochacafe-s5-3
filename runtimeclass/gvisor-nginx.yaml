@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: gvisor-nginx
+  name: gvisor-nginx
+spec:
+  runtimeClassName: gvisor
+  containers:
+  - image: nginx:1.21
+    name: gvisor-nginx
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Never
+status: {}

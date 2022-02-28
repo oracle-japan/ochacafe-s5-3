@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: both-test
+spec:
+  securityContext:
+    runAsUser: 1000
+  containers:
+  - name: ubuntu
+    image: ubuntu:21.10
+    securityContext:
+      runAsUser: 1001
+    command:
+      - sleep
+      - infinity

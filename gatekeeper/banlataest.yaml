@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nginx-latest
+spec:
+  containers:
+  - name: nginx-latesttag
+    image: nginx:latest

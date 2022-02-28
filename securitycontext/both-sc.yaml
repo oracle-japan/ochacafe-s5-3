@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: both-sc
+spec:
+  securityContext:
+    runAsNonRoot: true
+  containers:
+  - name: nginx-container
+    image: nginx:1.21
+    securityContext:
+      runAsNonRoot: true
