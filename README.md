@@ -5,6 +5,10 @@ Ochacafe5 #3 Kubernetes Security
 
 # Kubernetes Cluster 構築
 
+事前に以下のスペックで仮想マシンを作成して、SSHログイン可能な状態にしておきます。
+
+VCNのセキュリティリストで「10.0.0.0/16」TCP 全てのプロトコルを許可しておきます。
+
 ## ControlPlane & Node 共通セットアップ
 
 ### netfilter セットアップ
@@ -154,13 +158,16 @@ systemctl restart kubelet
 kubeadm init --pod-network-cidr=192.168.0.0/16
 ```
 
-以下コマンドをNodeで実施
+以下コマンドをNodeセットアップ完了後にNodeで実施するので、
+テキストエディタ等にコマンドを保存。
 
 ```sh
 kubeadm join ***.***.***.***:6443 --token xxxxxxxxxxxxxxxxxxxxxxxx --discovery-token-ca-cert-hash sha256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ### kubeconfig セットアップ
+
+Control Planeで実施
 
 ```sh
 mkdir -p $HOME/.kube
@@ -176,6 +183,8 @@ chown $(id -u):$(id -g) $HOME/.kube/config
 
 ### Calico インストール
 
+Control Planeで実施
+
 ```sh
 kubectl create -f https://docs.projectcalico.org/manifests/tigera-operator.yaml
 ```
@@ -189,9 +198,8 @@ kubectl get nodes
 ```
 
 ```sh
-NAME         STATUS   ROLES                  AGE   VERSION
-k8s-master   Ready    control-plane,master   69m   v1.23.3
-k8s-node     Ready    <none>                 53m   v1.23.3
+NAME                         STATUS   ROLES                  AGE     VERSION
+k8s-control-plane            Ready    control-plane,master   3m34s   v1.23.4
 ```
 
 ## Node セットアップ
@@ -202,6 +210,18 @@ sudo -i
 
 ```sh
 kubeadm join ***.***.***.***:6443 --token xxxxxxxxxxxxxxxxxxxxxxxx --discovery-token-ca-cert-hash sha256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+ControlPlaneまたはManage Server（kubectlセットアップ後）で以下コマンドを実施
+
+```sh
+kubectl get nodes
+```
+
+```sh
+NAME                         STATUS   ROLES                  AGE     VERSION
+k8s-control-plane            Ready    control-plane,master   18m     v1.23.4
+k8s-node                     Ready    <none>                 4m44s   v1.23.4
 ```
 
 ## Manage Server セットアップ
