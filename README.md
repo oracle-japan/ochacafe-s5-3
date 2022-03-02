@@ -866,6 +866,13 @@ Then restart the API Server.
 0 checks INFO
 ```
 
+```sh
+kubectl delete -f ochacafe-s5-3/kube-bench/job-master.yaml
+```
+```sh
+job.batch "kube-bench-master" deleted
+```
+
 # Kubernetes Security - Cluster Hardening -
 
 ## RBAC
@@ -977,8 +984,7 @@ Podの一覧を取得
 kubectl --as=system:serviceaccount:default:pod-sa get pods
 ```
 ```sh
-NAME                      READY   STATUS      RESTARTS   AGE
-kube-bench-master-64mwj   0/1     Completed   0          58m
+No resources found in default namespace.
 ```
 
 Podを作成しようと試みる
@@ -1216,7 +1222,6 @@ kubectl get pods
 ```sh
 NAME                      READY   STATUS      RESTARTS   AGE
 hello-apparmor            1/1     Running     0          26s
-kube-bench-master-64mwj   0/1     Completed   0          4h35m
 ```
 
 コンテナがこのプロファイルで実際に実行されていることを確認するために、コンテナのproc attrをチェック。
@@ -1340,7 +1345,6 @@ kubectl get pods
 ```
 ```sh
 NAME                      READY   STATUS      RESTARTS   AGE
-kube-bench-master-64mwj   0/1     Completed   0          6h3m
 prohibit-mkdir            1/1     Running     0          16s
 ```
 
@@ -1361,4 +1365,125 @@ kubectl delete -f ochacafe-s5-3/seccomp/prohibit-mkdir.yaml
 ```
 ```sh
 pod "prohibit-mkdir" deleted
+```
+
+# Kubernetes Security - Minimize Microservice Vulnerabilities -
+
+## SecurityContext
+
+```sh
+cat ochacafe-s5-3/securitycontext/container-sc.yaml
+```
+```sh
+apiVersion: v1
+kind: Pod
+metadata:
+  name: container-sc
+spec:
+  containers:
+  - name: nginx-container
+    image: nginx:1.21
+    securityContext:
+      runAsNonRoot: true
+```
+
+```sh
+kubectl apply -f ochacafe-s5-3/securitycontext/container-sc.yaml
+```
+```sh
+pod/container-sc created
+```
+
+```sh
+cat ochacafe-s5-3/securitycontext/pod-sc.yaml
+```
+```sh
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-sc
+spec:
+  securityContext:
+    runAsNonRoot: true
+  containers:
+  - name: nginx-container
+    image: nginx:1.21
+```
+
+```sh
+kubectl apply -f ochacafe-s5-3/securitycontext/pod-sc.yaml
+```
+```sh
+pod/pod-sc created
+```
+
+どちらとも結果としては、runAsNonRootによりNginx Podは作成されない。
+
+```sh
+kubectl get pods
+```
+```sh
+NAME                      READY   STATUS                       RESTARTS   AGE
+container-sc              0/1     CreateContainerConfigError   0          62s
+pod-sc                    0/1     CreateContainerConfigError   0          23s
+```
+
+両方に設定した場合は、「spec.containers.securityContext」が優先される。
+
+```sh
+cat ochacafe-s5-3/securitycontext/both-test.yaml
+```
+```sh
+apiVersion: v1
+kind: Pod
+metadata:
+  name: both-test
+spec:
+  securityContext:
+    runAsUser: 1000
+  containers:
+  - name: ubuntu
+    image: ubuntu:21.10
+    securityContext:
+      runAsUser: 1001
+    command:
+      - sleep
+      - infinity
+```
+
+```sh
+kubectl apply -f ochacafe-s5-3/securitycontext/both-test.yaml
+```
+```sh
+pod/both-test created
+```
+
+「spec.containers.securityContext.runAsUser」が適用されているが確認できる。
+
+```sh
+kubectl exec both-test -- id
+```
+```sh
+uid=1001 gid=0(root) groups=0(root)
+```
+
+```sh
+kubectl delete -f ochacafe-s5-3/securitycontext/container-sc.yaml
+```
+```sh
+pod "container-sc" deleted
+```
+
+```sh
+kubectl delete -f ochacafe-s5-3/securitycontext/pod-sc.yaml
+```
+```sh
+pod "pod-sc" deleted
+```
+
+```sh
+kubectl delete -f ochacafe-s5-3/securitycontext/both-test.yaml
+```
+```sh
+pod "both-test" deleted
 ```
