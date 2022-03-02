@@ -267,3 +267,848 @@ NAME                         STATUS   ROLES                  AGE     VERSION
 k8s-control-plane            Ready    control-plane,master   18m     v1.23.4
 k8s-node                     Ready    <none>                 4m44s   v1.23.4
 ```
+
+### リポジトリから資材のクローン
+
+```sh
+git clone https://github.com/oracle-japan/ochacafe-s5-3.git
+```
+
+# Kubernetes Security - Cluster Setup -
+
+## NetworkPolicy
+
+### 1.全ての送信トラフィックを許可、受信トラフィックは拒否
+
+#### サンプルPodとNamespaceの作成
+
+```sh
+kubectl apply -f ochacafe-s5-3/networkpolicy/sample-pod.yaml
+```
+```sh
+pod/sample-pod-1 created
+pod/sample-pod-2 created
+namespace/test created
+pod/sample-pod-3 created
+pod/sample-pod-4 created
+```
+
+```sh
+kubectl get pods
+```
+```sh
+NAME           READY   STATUS    RESTARTS   AGE
+sample-pod-1   1/1     Running   0          108s
+sample-pod-2   1/1     Running   0          108s
+```
+
+```sh
+kubectl get pods -n test
+```
+```sh
+NAME           READY   STATUS    RESTARTS   AGE
+sample-pod-3   1/1     Running   0          2m19s
+sample-pod-4   1/1     Running   0          2m19s
+```
+
+```sh
+kubectl get namespaces
+```
+```sh
+NAME               STATUS   AGE
+calico-apiserver   Active   71m
+calico-system      Active   72m
+default            Active   74m
+kube-node-lease    Active   74m
+kube-public        Active   74m
+kube-system        Active   74m
+test               Active   2m58s
+tigera-operator    Active   72m
+```
+
+#### Namespace「default」と「test」に「egress-only-allow-networkpoplicy.yaml」を適用
+
+```sh
+kubectl apply -f ochacafe-s5-3/networkpolicy/egress-only-allow-networkpolicy.yaml
+```
+```sh
+networkpolicy.networking.k8s.io/egress-only-allow-networkpolicy created
+```
+
+```sh
+kubectl apply -f ochacafe-s5-3/networkpolicy/egress-only-allow-networkpolicy.yaml -n test
+```
+```sh
+networkpolicy.networking.k8s.io/egress-only-allow-networkpolicy created
+```
+
+各Podの状況確認
+
+```sh
+kubectl get pod -o wide
+```
+```sh
+NAME           READY   STATUS    RESTARTS   AGE   IP                NODE              NOMINATED NODE   READINESS GATES
+sample-pod-1   1/1     Running   0          13m   192.168.173.129   k8s-node-517516   <none>           <none>
+sample-pod-2   1/1     Running   0          13m   192.168.173.130   k8s-node-517516   <none>           <none>
+```
+
+```sh
+kubectl get pod -o wide -n test
+```
+```sh
+NAME           READY   STATUS    RESTARTS   AGE   IP                NODE              NOMINATED NODE   READINESS GATES
+sample-pod-3   1/1     Running   0          14m   192.168.173.132   k8s-node-517516   <none>           <none>
+sample-pod-4   1/1     Running   0          14m   192.168.173.131   k8s-node-517516   <none>           <none>
+```
+
+※ローカルIPは自動で割り振られるため上記と異なる場合はご自身の環境に合わせてください
+
+この状態で、「sample-pod-1」から他のPodへのアクセスは不可
+
+```sh
+kubectl exec -it sample-pod-1 -- /bin/bash
+```
+```sh
+curl 192.168.173.130
+```
+```sh
+curl 192.168.173.132
+```
+```sh
+curl 192.168.173.131
+```
+
+「sample-pod-1」からexit
+
+```sh
+exit
+```
+
+### 2.「app: pod1」から「app: pod2」のみ受信許可
+
+#### 「sp-pod-allow-networkpolicy.yaml」を適用
+
+```sh
+kubectl apply -f ochacafe-s5-3/networkpolicy/sp-pod-allow-networkpolicy.yaml
+```
+```sh
+networkpolicy.networking.k8s.io/sp-pod-allow-networkpolicy created
+```
+
+#### 「sample-pod-1」から「sample-pod-2」へのアクセスは可、他のPodへのアクセスは不可
+
+```sh
+kubectl exec -it sample-pod-1 -- /bin/bash
+```
+```sh
+curl 192.168.173.130
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+```
+```sh
+curl 192.168.173.132
+```
+```sh
+curl 192.168.173.131
+```
+
+「sample-pod-1」からexit
+
+```sh
+exit
+```
+
+### 3.Namespace defaultのPodから「app: pod3」のみ受信許可
+
+#### 「sp-namespace-allow-networkpolicy.yaml」の適用
+
+```sh
+kubectl apply -f ochacafe-s5-3/networkpolicy/sp-namespace-allow-networkpolicy.yaml
+```
+```sh
+networkpolicy.networking.k8s.io/sp-namespace-allow-networkpolicy created
+```
+
+#### 「sample-pod-1」から「sample-pod-2」から、「sample-pod-3」へのアクセスは可、「sample-pod-4」へのアクセスは不可
+
+```sh
+kubectl exec -it sample-pod-1 -- /bin/bash
+```
+```sh
+curl 192.168.173.132
+```
+```sh
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+```
+```sh
+curl 192.168.173.131
+```
+
+「sample-pod-1」からexit
+
+```sh
+exit
+```
+
+```sh
+kubectl exec -it sample-pod-2 -- /bin/bash
+```
+```sh
+curl 192.168.173.132
+```
+```sh
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+```
+
+```sh
+curl 192.168.173.131
+```
+
+「sample-pod-2」からexit
+
+```sh
+exit
+```
+
+NetworkPolicyの削除
+
+```sh
+kubectl delete -f ochacafe-s5-3/networkpolicy/sp-namespace-allow-networkpolicy.yaml
+```
+```sh
+networkpolicy.networking.k8s.io/sp-namespace-allow-networkpolicy delete
+```
+
+### 4. 特定のIP Podから「app: pod3」のみ受信許可
+
+#### 「sp-ip-allow-networkpolicy.yaml」の適用
+
+```sh
+kubectl apply -f ochacafe-s5-3/networkpolicy/sp-ip-allow-networkpolicy.yaml
+```
+```sh
+networkpolicy.networking.k8s.io/sp-ip-allow-networkpolicy created
+```
+
+#### 「sample-pod-2」からのみ、「sample-pod-3」へのアクセスは可、それ以外へのアクセスは不可
+
+```sh
+kubectl exec -it sample-pod-1 -- /bin/bash
+```
+```sh
+curl 192.168.173.132
+```
+```sh
+curl 192.168.173.131
+```
+
+「sample-pod-1」からexit
+
+```sh
+exit
+```
+
+```sh
+kubectl exec -it sample-pod-2 -- /bin/bash
+```
+```sh
+curl 192.168.173.132
+```
+```sh
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+html { color-scheme: light dark; }
+body { width: 35em; margin: 0 auto;
+font-family: Tahoma, Verdana, Arial, sans-serif; }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+```
+```sh
+curl 192.168.173.131
+```
+
+「sample-pod-2」からexit
+
+```sh
+exit
+```
+
+#### 適用したNetwork PolicyとサンプルPodを削除
+
+Network Policyの削除
+
+```sh
+kubectl delete -f ochacafe-s5-3/networkpolicy/sp-ip-allow-networkpolicy.yaml
+```
+```sh
+networkpolicy.networking.k8s.io "sp-ip-allow-networkpolicy" deleted
+```
+
+```sh
+kubectl delete -f ochacafe-s5-3/networkpolicy/sp-pod-allow-networkpolicy.yaml
+```
+```sh
+networkpolicy.networking.k8s.io "sp-pod-allow-networkpolicy" deleted
+```
+
+```sh
+kubectl delete -f ochacafe-s5-3/networkpolicy/egress-only-allow-networkpolicy.yaml
+```
+```sh
+networkpolicy.networking.k8s.io "egress-only-allow-networkpolicy" deleted
+```
+
+```sh
+kubectl delete -f ochacafe-s5-3/networkpolicy/egress-only-allow-networkpolicy.yaml -n test
+```
+```sh
+networkpolicy.networking.k8s.io "egress-only-allow-networkpolicy" deleted
+```
+
+```sh
+kubectl get networkpolicy --all-namespaces
+```
+```sh
+NAMESPACE          NAME              POD-SELECTOR     AGE
+calico-apiserver   allow-apiserver   apiserver=true   149m
+```
+
+サンプルPodの削除
+
+```sh
+kubectl delete -f ochacafe-s5-3/networkpolicy/sample-pod.yaml
+```
+
+## CIS Benchmark
+
+### 1.「job-master.yaml」の作成
+
+```sh
+cat ochacafe-s5-3/kube-bench/job-master.yaml
+```
+```sh
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kube-bench-master
+spec:
+  template:
+    spec:
+      hostPID: true
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: kube-bench
+          image: aquasec/kube-bench:latest
+          #command: ["kube-bench", "run", "--targets", "master"]
+          command: ["kube-bench"] #変更
+          args: ["--version=1.23"] #追加
+          volumeMounts:
+            - name: var-lib-etcd
+              mountPath: /var/lib/etcd
+              readOnly: true
+            - name: var-lib-kubelet
+              mountPath: /var/lib/kubelet
+              readOnly: true
+            - name: var-lib-kube-scheduler
+              mountPath: /var/lib/kube-scheduler
+              readOnly: true
+            - name: var-lib-kube-controller-manager
+              mountPath: /var/lib/kube-controller-manager
+              readOnly: true
+            - name: etc-systemd
+              mountPath: /etc/systemd
+              readOnly: true
+            - name: lib-systemd
+              mountPath: /lib/systemd/
+              readOnly: true
+            - name: srv-kubernetes
+              mountPath: /srv/kubernetes/
+              readOnly: true
+            - name: etc-kubernetes
+              mountPath: /etc/kubernetes
+              readOnly: true
+              # /usr/local/mount-from-host/bin is mounted to access kubectl / kubelet, for auto-detecting the Kubernetes version.
+              # You can omit this mount if you specify --version as part of the command.
+            - name: usr-bin
+              mountPath: /usr/local/mount-from-host/bin
+              readOnly: true
+            - name: etc-cni-netd
+              mountPath: /etc/cni/net.d/
+              readOnly: true
+            - name: opt-cni-bin
+              mountPath: /opt/cni/bin/
+              readOnly: true
+            - name: etc-passwd
+              mountPath: /etc/passwd
+              readOnly: true
+            - name: etc-group
+              mountPath: /etc/group
+              readOnly: true
+      restartPolicy: Never
+      volumes:
+        - name: var-lib-etcd
+          hostPath:
+            path: "/var/lib/etcd"
+        - name: var-lib-kubelet
+          hostPath:
+            path: "/var/lib/kubelet"
+        - name: var-lib-kube-scheduler
+          hostPath:
+            path: "/var/lib/kube-scheduler"
+        - name: var-lib-kube-controller-manager
+          hostPath:
+            path: "/var/lib/kube-controller-manager"
+        - name: etc-systemd
+          hostPath:
+            path: "/etc/systemd"
+        - name: lib-systemd
+          hostPath:
+            path: "/lib/systemd"
+        - name: srv-kubernetes
+          hostPath:
+            path: "/srv/kubernetes"
+        - name: etc-kubernetes
+          hostPath:
+            path: "/etc/kubernetes"
+        - name: usr-bin
+          hostPath:
+            path: "/usr/bin"
+        - name: etc-cni-netd
+          hostPath:
+            path: "/etc/cni/net.d/"
+        - name: opt-cni-bin
+          hostPath:
+            path: "/opt/cni/bin/"
+        - name: etc-passwd
+          hostPath:
+            path: "/etc/passwd"
+        - name: etc-group
+          hostPath:
+            path: "/etc/group"
+```
+
+### 2. kube-bench の実行
+
+「job-master.yaml」の適用
+
+```sh
+kubectl apply -f ochacafe-s5-3/kube-bench/job-master.yaml
+```
+```sh
+job.batch/kube-bench-master created
+```
+
+「kube-bench-master」PodのSTATUSがCompletedになるまで待つ。
+
+```sh
+kubectl get pods
+```
+```sh
+NAME                      READY   STATUS      RESTARTS   AGE
+kube-bench-master-64mwj   0/1     Completed   0          40s
+```
+
+### 3. 結果の確認
+
+CompletedしたPodのログを確認
+
+```sh
+kubectl logs kube-bench-master-64mwj
+```
+```sh
+・
+・（省略）
+・
+== Remediations master ==
+・
+・（省略）
+・
+1.2.15 Follow the documentation and create Pod Security Policy objects as per your environment.
+Then, edit the API server pod specification file /etc/kubernetes/manifests/kube-apiserver.yaml
+on the master node and set the --enable-admission-plugins parameter to a
+value that includes PodSecurityPolicy:
+--enable-admission-plugins=...,PodSecurityPolicy,...
+Then restart the API Server.
+・
+・（省略）
+・
+== Summary master ==
+42 checks PASS
+11 checks FAIL
+11 checks WARN
+0 checks INFO
+・
+・（省略）
+・
+== Summary etcd ==
+7 checks PASS
+0 checks FAIL
+0 checks WARN
+0 checks INFO
+・
+・（省略）
+・
+== Summary controlplane ==
+0 checks PASS
+0 checks FAIL
+3 checks WARN
+0 checks INFO
+・
+・（省略）
+・
+== Summary node ==
+19 checks PASS
+1 checks FAIL
+3 checks WARN
+0 checks INFO
+・
+・（省略）
+・
+== Summary policies ==
+0 checks PASS
+0 checks FAIL
+26 checks WARN
+0 checks INFO
+
+== Summary total ==
+68 checks PASS
+12 checks FAIL
+43 checks WARN
+0 checks INFO
+```
+
+# Kubernetes Security - Cluster Hardening -
+
+## RBAC
+
+### 1.roleとrolebinding
+
+#### 「pod-sa」というServiceAccountを作成
+
+```sh
+kubectl create serviceaccount pod-sa
+```
+```sh
+serviceaccount/pod-sa created
+```
+
+```sh
+kubectl get serviceaccounts
+```
+```sh
+NAME      SECRETS   AGE
+default   1         3h28m
+pod-sa    1         9s
+```
+
+#### 「pod-role」というroleを作成
+
+```sh
+kubectl create role pod-role --resource pods --verb list -o yaml --dry-run=client > pod-role.yaml
+```
+
+```sh
+cat pod-role.yaml
+```
+```sh
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: pod-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
+```
+
+```sh
+kubectl apply -f pod-role.yaml
+```
+```sh
+role.rbac.authorization.k8s.io/pod-role created
+```
+
+```sh
+kubectl get roles
+```
+```sh
+NAME       CREATED AT
+pod-role   2022-03-02T08:15:22Z
+```
+
+#### 「pod-rolebinding」というrolebindingの作成及び「pod-sa」というServiceAccountと紐づける
+
+ServiceAccout pod-saでは、defaultのNamespaceでPodの一覧のみ取得が許可されているので、Podを作成しようとするとエラーとなる。
+
+```sh
+kubectl create rolebinding pod-rolebinding --role pod-role --serviceaccount default:pod-sa -o yaml --dry-run=client > pod-rolebinding.yaml
+```
+
+```sh
+cat pod-rolebinding.yaml
+```
+```sh
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  creationTimestamp: null
+  name: pod-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pod-role
+subjects:
+- kind: ServiceAccount
+  name: pod-sa
+  namespace: default
+```
+
+```sh
+kubectl apply -f pod-rolebinding.yaml
+```
+```sh
+rolebinding.rbac.authorization.k8s.io/pod-rolebinding created
+```
+
+```sh
+kubectl get rolebindings
+```
+```sh
+NAME              ROLE            AGE
+pod-rolebinding   Role/pod-role   45s
+```
+
+Podの一覧を取得
+
+```sh
+kubectl --as=system:serviceaccount:default:pod-sa get pods
+```
+```sh
+NAME                      READY   STATUS      RESTARTS   AGE
+kube-bench-master-64mwj   0/1     Completed   0          58m
+```
+
+Podを作成しようと試みる
+
+```sh
+kubectl --as=system:serviceaccount:default:pod-sa run nginx --image=nginx
+```
+```sh
+Error from server (Forbidden): pods is forbidden: User "system:serviceaccount:default:pod-sa" cannot create resource "pods" in API group "" in the namespace "default"
+```
+
+### 2.clusterroleとclusterrolebinding
+
+#### 「namespace-sa」というServiceAccountを作成
+
+```sh
+kubectl create serviceaccount namespace-sa
+```
+```sh
+serviceaccount/namespace-sa created
+```
+
+```sh
+kubectl get serviceaccounts
+```
+```sh
+NAME           SECRETS   AGE
+default        1         4h
+namespace-sa   1         9s
+pod-sa         1         32m
+```
+
+#### 「namespace-clusterrole」というclusterroleを作成
+
+```sh
+kubectl create clusterrole namespace-clusterrole --resource namespaces --verb list -o yaml --dry-run=client > namespace-clusterrole.yaml
+```
+
+```sh
+cat namespace-clusterrole.yaml
+```
+```sh
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: namespace-clusterrole
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - list
+```
+
+```sh
+kubectl apply -f namespace-clusterrole.yaml
+```
+```sh
+clusterrole.rbac.authorization.k8s.io/namespace-clusterrole created
+```
+
+```sh
+kubectl get clusterroles | grep namespace-clusterrole
+```
+```sh
+namespace-clusterrole                                                  2022-03-02T08:49:55Z
+```
+
+#### 「namespace-clusterrolebinding」というclusterrolebindingの作成及び「namespace-sa」というServiceAccountと紐づける
+
+ServiceAccout namespace-saでは、defaultのNamespaceでNamespaceの一覧のみ取得が許可されているので、Namespaceを作成しようとするとエラーとなる。
+
+```sh
+kubectl create clusterrolebinding namespace-clusterrolebinding --clusterrole namespace-clusterrole --serviceaccount default:namespace-sa -o yaml --dry-run=client > namespace-clusterrolebinding.yaml
+```
+
+```sh
+cat namespace-clusterrolebinding.yaml
+```
+```sh
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: namespace-clusterrolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: namespace-clusterrole
+subjects:
+- kind: ServiceAccount
+  name: namespace-sa
+  namespace: default
+```
+
+```sh
+kubectl apply -f namespace-clusterrolebinding.yaml
+```
+```sh
+clusterrolebinding.rbac.authorization.k8s.io/namespace-clusterrolebinding created
+```
+
+```sh
+kubectl get clusterrolebindings | grep namespace-clusterrolebinding
+```
+```sh
+namespace-clusterrolebinding                           ClusterRole/namespace-clusterrole                                                  45s
+```
+
+Namespaceの一覧を取得
+
+```sh
+kubectl --as=system:serviceaccount:default:namespace-sa get namespaces
+```
+```sh
+NAME               STATUS   AGE
+calico-apiserver   Active   4h15m
+calico-system      Active   4h16m
+default            Active   4h18m
+kube-node-lease    Active   4h18m
+kube-public        Active   4h18m
+kube-system        Active   4h18m
+tigera-operator    Active   4h16m
+```
+
+Namespaceを作成しようと試みる
+
+```sh
+kubectl --as=system:serviceaccount:default:namespace-sa create namespace mynamespace
+```
+```sh
+Error from server (Forbidden): namespaces is forbidden: User "system:serviceaccount:default:namespace-sa" cannot create resource "namespaces" in API group "" at the cluster scope
+```
