@@ -9,6 +9,8 @@ Ochacafe5 #3 Kubernetes Security
 
 VCNのセキュリティリストで「10.0.0.0/16」TCP 全てのプロトコルを許可しておきます。
 
+以下手順は全てrootで行います。
+
 ## ControlPlane & Node 共通セットアップ
 
 ### netfilter セットアップ
@@ -868,7 +870,7 @@ Then restart the API Server.
 
 ## RBAC
 
-### 1.roleとrolebinding
+### 1.roleとrolebinding(k8s-manage)
 
 #### 「pod-sa」というServiceAccountを作成
 
@@ -988,7 +990,7 @@ kubectl --as=system:serviceaccount:default:pod-sa run nginx --image=nginx
 Error from server (Forbidden): pods is forbidden: User "system:serviceaccount:default:pod-sa" cannot create resource "pods" in API group "" in the namespace "default"
 ```
 
-### 2.clusterroleとclusterrolebinding
+### 2.clusterroleとclusterrolebinding(k8s-manage)
 
 #### 「namespace-sa」というServiceAccountを作成
 
@@ -1111,4 +1113,252 @@ kubectl --as=system:serviceaccount:default:namespace-sa create namespace mynames
 ```
 ```sh
 Error from server (Forbidden): namespaces is forbidden: User "system:serviceaccount:default:namespace-sa" cannot create resource "namespaces" in API group "" at the cluster scope
+```
+
+# Kubernetes Security - System Hardening -
+
+## AppArmor
+
+### 1.Nodeに接続して、apparmorが有効か確認(k8s-node)
+
+「Y」と表示されれば有効状態
+
+```sh
+cat /sys/module/apparmor/parameters/enabled
+```
+```sh
+Y
+```
+
+### 2.Nodeに接続して、以下のAppArmor Profileを作成(k8s-node)
+
+ファイル書き込みを拒否するAppArmor Profileを作成
+
+```sh
+vim /etc/apparmor.d/k8s-apparmor-example-deny-write
+```
+```sh
+#include <tunables/global>
+
+profile k8s-apparmor-example-deny-write flags=(attach_disconnected) {
+  #include <abstractions/base>
+
+  file,
+
+  # Deny all file writes.
+  deny /** w,
+}
+```
+
+### 3.apparmor_parserコマンドを実行して、AppArmorプロファイルを登録(k8s-node)
+
+```sh
+apparmor_parser -q /etc/apparmor.d/k8s-apparmor-example-deny-write
+```
+
+```sh
+aa-status | grep k8s-apparmor-example-deny-write
+```
+```sh
+   k8s-apparmor-example-deny-write
+   /usr/bin/sleep (92896) k8s-apparmor-example-deny-write
+```
+
+Nodeからexit
+
+```sh
+exit
+```
+```sh
+logout
+```
+```sh
+exit
+```
+```sh
+logout
+Connection to 144.21.***.*** closed.
+```
+
+### 4.AppArmor Profileのアノテーションを定義したマニフェストの作成(k8s-manage)
+
+```sh
+cat ochacafe-s5-3/apparomor/hello-apparomor.yaml
+```
+```sh
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hello-apparmor
+  annotations:
+    # Tell Kubernetes to apply the AppArmor profile "k8s-apparmor-example-deny-write".
+    # Note that this is ignored if the Kubernetes node is not running version 1.4 or greater.
+    container.apparmor.security.beta.kubernetes.io/hello: localhost/k8s-apparmor-example-deny-write
+spec:
+  containers:
+  - name: hello
+    image: busybox
+    command: [ "sh", "-c", "echo 'Hello AppArmor!' && sleep 1h" ]
+```
+
+### 5.マニフェスト適用(k8s-manage)
+
+```sh
+kubectl apply -f ochacafe-s5-3/apparomor/hello-apparomor.yaml
+```
+```sh
+pod/hello-apparmor created
+```
+
+```sh
+kubectl get pods
+```
+```sh
+NAME                      READY   STATUS      RESTARTS   AGE
+hello-apparmor            1/1     Running     0          26s
+kube-bench-master-64mwj   0/1     Completed   0          4h35m
+```
+
+コンテナがこのプロファイルで実際に実行されていることを確認するために、コンテナのproc attrをチェック。
+
+```sh
+kubectl exec hello-apparmor -- cat /proc/1/attr/current
+```
+```sh
+k8s-apparmor-example-deny-write (enforce)
+```
+
+### 6.ファイルを書き込みによる動作確認(k8s-manage)
+
+起動したPodからファイルを作成してエラーとなることを確認
+
+```sh
+kubectl exec hello-apparmor -- touch /tmp/test
+```
+```sh
+touch: /tmp/file: Permission denied
+command terminated with exit code 1
+```
+
+※プロファイルをannotationに設定せずに起動した場合は、「/tmp/test」は作成される
+
+```sh
+kubectl delete -f ochacafe-s5-3/apparomor/hello-apparomor.yaml
+```
+```sh
+pod/hello-apparmor delete
+```
+
+## Seccomp
+
+### 1.Nodeに接続して、seccompが有効か確認(k8s-node)
+
+「CONFIG_SECCOMP=y」と表示されれば有効状態
+
+```sh
+grep CONFIG_SECCOMP= /boot/config-$(uname -r)
+```
+```sh
+CONFIG_SECCOMP=y
+```
+
+### 2.seccompのprofileを作成(k8s-node)
+
+専用ディレクトリを作成
+
+```sh
+mkdir -p /var/lib/kubelet/seccomp/profiles
+```
+
+プロファイルを作成
+
+```sh
+vim /var/lib/kubelet/seccomp/profiles/prohibit-mkdir.json
+```
+```sh
+{
+  "defaultAction": "SCMP_ACT_ALLOW",
+  "syscalls": [
+    {
+      "names": ["mkdir","mkdirat"],
+      "action": "SCMP_ACT_ERRNO"
+    }
+  ]
+}
+```
+
+Nodeからexit
+
+```sh
+exit
+```
+```sh
+logout
+```
+```sh
+exit
+```
+```sh
+logout
+Connection to 144.21.***.*** closed.
+```
+
+### 3.Profileを指定したマニフェストを作成(k8s-manage)
+
+```sh
+cat ochacafe-s5-3/seccomp/prohibit-mkdir.yaml
+```
+```sh
+apiVersion: v1
+kind: Pod
+metadata:
+  name: prohibit-mkdir
+spec:
+  securityContext:
+    seccompProfile:
+      type: Localhost
+      localhostProfile: profiles/prohibit-mkdir.json
+  containers:
+    - name: ubuntu
+      image: ubuntu:21.10
+      command:
+        - sleep
+        - infinity
+```
+
+### 4.マニフェストを適用(k8s-manage)
+
+```sh
+kubectl ochacafe-s5-3/seccomp/prohibit-mkdir.yaml
+```
+```sh
+pod/prohibit-mkdir created
+```
+
+```sh
+kubectl get pods
+```
+```sh
+NAME                      READY   STATUS      RESTARTS   AGE
+kube-bench-master-64mwj   0/1     Completed   0          6h3m
+prohibit-mkdir            1/1     Running     0          16s
+```
+
+### 5.挙動確認(k8s-manage)
+
+ディレクトリを作成を試みるがエラーとなる。
+
+```sh
+kubectl exec -it prohibit-mkdir -- mkdir test
+```
+```sh
+mkdir: cannot create directory 'test': Operation not permitted
+command terminated with exit code 1
+```
+
+```sh
+kubectl delete -f ochacafe-s5-3/seccomp/prohibit-mkdir.yaml
+```
+```sh
+pod "prohibit-mkdir" deleted
 ```
