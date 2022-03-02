@@ -233,7 +233,7 @@ sudo -i
 ### kubectl インストール
 
 ```sh
-curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl"
 ```
 
 ```sh
@@ -256,4 +256,14 @@ mkdir -p $HOME/.kube
 
 ```sh
 vim $HOME/.kube/config
+```
+
+```sh
+kubectl get nodes
+```
+
+```sh
+NAME                         STATUS   ROLES                  AGE     VERSION
+k8s-control-plane            Ready    control-plane,master   18m     v1.23.4
+k8s-node                     Ready    <none>                 4m44s   v1.23.4
 ```
