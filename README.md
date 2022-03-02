@@ -1204,7 +1204,7 @@ spec:
 ### 5.マニフェスト適用(k8s-manage)
 
 ```sh
-kubectl apply -f ochacafe-s5-3/apparomor/hello-apparomor.yaml
+kubectl apply -f ochacafe-s5-3/apparmor/hello-apparmor.yaml
 ```
 ```sh
 pod/hello-apparmor created
@@ -1243,10 +1243,10 @@ command terminated with exit code 1
 ※プロファイルをannotationに設定せずに起動した場合は、「/tmp/test」は作成される
 
 ```sh
-kubectl delete -f ochacafe-s5-3/apparomor/hello-apparomor.yaml
+kubectl delete -f ochacafe-s5-3/apparmor/hello-apparmor.yaml
 ```
 ```sh
-pod/hello-apparmor delete
+pod "hello-apparmor" deleted
 ```
 
 ## Seccomp
@@ -1329,7 +1329,7 @@ spec:
 ### 4.マニフェストを適用(k8s-manage)
 
 ```sh
-kubectl ochacafe-s5-3/seccomp/prohibit-mkdir.yaml
+kubectl apply -f ochacafe-s5-3/seccomp/prohibit-mkdir.yaml
 ```
 ```sh
 pod/prohibit-mkdir created
