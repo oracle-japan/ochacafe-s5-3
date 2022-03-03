@@ -1,0 +1,29 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: edit-restricted
+rules:
+- apiGroups:
+  - policy
+  resourceNames:
+  - restricted-psp
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
+root@k8s-manage:~# ^C
+root@k8s-manage:~# cat edit-restricted-clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: edit-restricted
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: edit-restricted
+subjects:
+- kind: ServiceAccount
+  name: edit-user
+  namespace: default
