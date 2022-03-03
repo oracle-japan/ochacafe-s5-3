@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: apache
+  name: apache
+spec:
+  containers:
+  - image: httpd:2.4.52
+    name: apache

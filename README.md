@@ -1371,6 +1371,8 @@ pod "prohibit-mkdir" deleted
 
 ## SecurityContext
 
+(k8s-manage)
+
 ```sh
 cat ochacafe-s5-3/securitycontext/container-sc.yaml
 ```
@@ -1486,4 +1488,812 @@ kubectl delete -f ochacafe-s5-3/securitycontext/both-test.yaml
 ```
 ```sh
 pod "both-test" deleted
+```
+
+### 事前準備
+
+### 1.kube-apiserverのAdmission ControlでPodSecurityPolicyを有効化する(k8s-control-plane)
+
+```sh
+vim /etc/kubernetes/manifests/kube-apiserver.yaml
+```
+```sh
+・
+・（省略）
+・
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --advertise-address=10.0.0.2
+    - --allow-privileged=true
+    - --authorization-mode=Node,RBAC
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt
+    - --enable-admission-plugins=NodeRestriction,PodSecurityPolicy
+・
+・（省略）
+・
+```
+
+Control Planeからexit
+
+```sh
+exit
+```
+```sh
+logout
+```
+```sh
+exit
+```
+```sh
+logout
+Connection to 144.21.***.*** closed.
+```
+
+### 2.PodSecurityPolicyへの権限を持たない「edit」のClusterRoleと紐づいた、ServiceAccount「edit-user」を作成(k8s-manage)
+
+```sh
+kubectl create serviceaccount edit-user
+```
+
+ServiceAccount 「edit-user」に edit 権限付与
+
+```sh
+kubectl create clusterrolebinding edit-user --clusterrole edit --serviceaccount default:edit-user -o yaml --dry-run=client > edit-user-crolebinding.yaml
+```
+
+```sh
+cat edit-user-crolebinding.yaml
+```
+```sh
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: edit-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: edit
+subjects:
+- kind: ServiceAccount
+  name: edit-user
+  namespace: default
+```
+
+マニフェスト適用
+
+```sh
+kubectl apply -f edit-user-crolebinding.yaml
+```
+```sh
+clusterrolebinding.rbac.authorization.k8s.io/edit-user created
+```
+
+```sh
+kubectl get clusterrolebindings | grep edit-user
+```
+```sh
+edit-user                                              ClusterRole/edit                                                                   11m
+```
+
+### 動作確認
+
+「cluster-admin」権限を持つdefault(serviceaccout)
+
+```sh
+alias kubectl-admin='kubectl'
+```
+
+「edit」権限を持つedit-user (serviceaccout)
+
+```sh
+alias kubectl-edit='kubectl --as=system:serviceaccount:default:edit-user'
+```
+
+### 1.PodSecurityPolicyの許可ポリシーを適用(k8s-manage)
+
+[公式ドキュメント](https://kubernetes.io/docs/concepts/policy/pod-security-policy/#example-policies
+)で公開されている許可ポリシーを利用して適用。
+
+```sh
+cat ochacafe-s5-3/psp/privileged-psp.yaml
+```
+```sh
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: privileged
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: '*'
+spec:
+  privileged: true
+  allowPrivilegeEscalation: true
+  allowedCapabilities:
+  - '*'
+  volumes:
+  - '*'
+  hostNetwork: true
+  hostPorts:
+  - min: 0
+    max: 65535
+  hostIPC: true
+  hostPID: true
+  runAsUser:
+    rule: 'RunAsAny'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+```
+
+```sh
+kubectl-admin apply -f ochacafe-s5-3/psp/privileged-psp.yaml
+```
+```sh
+Warning: policy/v1beta1 PodSecurityPolicy is deprecated in v1.21+, unavailable in v1.25+
+podsecuritypolicy.policy/privileged-psp created
+```
+
+適用確認
+
+```sh
+kubectl-admin get psp
+```
+```sh
+NAME                      PRIV    CAPS   SELINUX    RUNASUSER          FSGROUP     SUPGROUP    READONLYROOTFS   VOLUMES
+・
+・（省略）
+・
+privileged-psp            true    *      RunAsAny   RunAsAny           RunAsAny    RunAsAny    false            *
+・
+・（省略）
+・
+```
+
+adminとeditでNginx Podを作成するとどうなるか？
+
+```sh
+kubectl-admin run nginx-a --image nginx:1.21 --restart=Never
+```
+```sh
+pod/nginx-a created
+```
+
+```sh
+kubectl-edit run nginx-b --image nginx:1.21 --restart=Never
+```
+```sh
+Error from server (Forbidden): pods "nginx-b" is forbidden: PodSecurityPolicy: unable to admit pod: []
+```
+
+PodSecurityPolicyへの権限を持つadminはPod作成できるが、権限を持たないeditでは作成できない。
+
+### 2.PodSecurityPolicyの制限ポリシーを適用(k8s-manage)
+
+[公式ドキュメント](https://kubernetes.io/docs/concepts/policy/pod-security-policy/#example-policies
+)で公開されている制限ポリシーをベースとしたマニフェストを利用して適用。
+
+```sh
+kubectl-admin apply -f restricted-psp.yaml
+```
+```sh
+podsecuritypolicy.policy/restricted-psp created
+```
+
+```sh
+kubectl-admin get psp
+```
+```sh
+NAME                      PRIV    CAPS   SELINUX    RUNASUSER          FSGROUP     SUPGROUP    READONLYROOTFS   VOLUMES
+・
+・（省略）
+・
+restricted-psp            false   *      RunAsAny   MustRunAsNonRoot   RunAsAny    RunAsAny    false            *
+・
+・（省略）
+・
+```
+
+adminとeditでNginx Podを作成するとどうなるか？
+
+```sh
+kubectl-admin run nginx-c --image nginx:1.21 --restart=Never
+```
+```sh
+pod/nginx-c created
+```
+
+adminは、privileged, restricted 両方の権限を保有しているため、Podを作成できる。
+
+```sh
+kubectl-admin auth can-i use podsecuritypolicy/privileged-psp
+```
+```sh
+Warning: resource 'podsecuritypolicies' is not namespace scoped in group 'policy'
+yes
+```
+
+```sh
+kubectl-admin auth can-i use podsecuritypolicy/restricted-psp
+```
+```sh
+Warning: resource 'podsecuritypolicies' is not namespace scoped in group 'policy'
+yes
+```
+
+editは、privileged-psp, restricted-psp PodSecurityPolicyの権限を持っていない
+
+```sh
+kubectl-edit auth can-i use podsecuritypolicy/privileged-psp
+```
+```sh
+Warning: resource 'podsecuritypolicies' is not namespace scoped in group 'policy'
+no
+```
+
+```sh
+kubectl-edit auth can-i use podsecuritypolicy/restricted-psp
+```
+```sh
+Warning: resource 'podsecuritypolicies' is not namespace scoped in group 'policy'
+no
+```
+
+ClusterRoleを作成して、ClusterRoleBindingでedit（ServiceAccount）を紐づける
+
+```sh
+kubectl-admin create clusterrole edit-restricted --verb=use --resource=podsecuritypolicy --resource-name=restricted-psp
+```
+```sh
+clusterrole.rbac.authorization.k8s.io/edit-restricted created
+```
+
+```sh
+kubectl-admin create clusterrolebinding edit-restricted --clusterrole=edit-restricted --serviceaccount=default:edit-user
+```
+```sh
+clusterrolebinding.rbac.authorization.k8s.io/edit-restricted created
+```
+
+editはrestricted-psp PodSecurityPolicyの権限を持つ
+
+```sh
+kubectl-edit auth can-i use podsecuritypolicy/restricted-psp
+```
+```sh
+Warning: resource 'podsecuritypolicies' is not namespace scoped in group 'policy'
+yes
+```
+
+editでNginx Podを作成
+
+```sh
+kubectl-edit run nginx-d --image=nginx:1.21 --restart=Never
+```
+```sh
+pod/nginx-d created
+```
+
+Nginx Pod作成できるがコンテナが起動できない
+
+```sh
+kubectl-edit get pods
+```
+```sh
+NAME           READY   STATUS                       RESTARTS   AGE
+nginx-a        1/1     Running                      0          35m
+nginx-c        1/1     Running                      0          20m
+nginx-d        0/1     CreateContainerConfigError   0          59s
+```
+
+restricted-psp ポリシーには、「runAsUser」に「MustRunAsNonRoot」が定義されているのでPodが作成できない
+
+```sh
+kubectl-edit describe pod nginx-d
+```
+```sh
+・
+・（省略）
+・
+  Warning  Failed     21s (x12 over 2m18s)  kubelet            Error: container has runAsNonRoot and image will run as root (pod: "nginx-d_default(9032c822-a468-4367-b544-4e8b98232233)", container: nginx-d)
+・
+・（省略）
+・
+```
+
+root以外のユーザで起動できるNginx Imageに変更すると起動できる
+
+```sh
+kubectl-edit run nginx-e --image=nginxinc/nginx-unprivileged --restart=Never
+```
+```sh
+pod/nginx-e created
+```
+
+```sh
+kubectl-edit get pods
+```
+```sh
+NAME           READY   STATUS                       RESTARTS   AGE
+nginx-a        1/1     Running                      0          39m
+nginx-c        1/1     Running                      0          25m
+nginx-d        0/1     CreateContainerConfigError   0          5m49s
+nginx-e        1/1     Running                      0          47s
+```
+
+## Open Policy Agent
+
+### 1.Gatekeeperインストール(k8s-manage)
+
+```sh
+kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/v3.7.1/deploy/gatekeeper.yaml
+```
+```sh
+namespace/gatekeeper-system created
+resourcequota/gatekeeper-critical-pods created
+customresourcedefinition.apiextensions.k8s.io/assign.mutations.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/assignmetadata.mutations.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/configs.config.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/constraintpodstatuses.status.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/constrainttemplatepodstatuses.status.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/constrainttemplates.templates.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/modifyset.mutations.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/mutatorpodstatuses.status.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/providers.externaldata.gatekeeper.sh created
+serviceaccount/gatekeeper-admin created
+Warning: policy/v1beta1 PodSecurityPolicy is deprecated in v1.21+, unavailable in v1.25+
+podsecuritypolicy.policy/gatekeeper-admin created
+role.rbac.authorization.k8s.io/gatekeeper-manager-role created
+clusterrole.rbac.authorization.k8s.io/gatekeeper-manager-role created
+rolebinding.rbac.authorization.k8s.io/gatekeeper-manager-rolebinding created
+clusterrolebinding.rbac.authorization.k8s.io/gatekeeper-manager-rolebinding created
+secret/gatekeeper-webhook-server-cert created
+service/gatekeeper-webhook-service created
+deployment.apps/gatekeeper-audit created
+deployment.apps/gatekeeper-controller-manager created
+Warning: policy/v1beta1 PodDisruptionBudget is deprecated in v1.21+, unavailable in v1.25+; use policy/v1 PodDisruptionBudget
+poddisruptionbudget.policy/gatekeeper-controller-manager created
+mutatingwebhookconfiguration.admissionregistration.k8s.io/gatekeeper-mutating-webhook-configuration created
+validatingwebhookconfiguration.admissionregistration.k8s.io/gatekeeper-validating-webhook-configuration created
+```
+
+### 2.ConstraintTemplateの作成と適用(k8s-manage)
+
+```sh
+cat ochacafe-s5-3/opa/constrainttemplate.yaml
+```
+```sh
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: notlatestimage
+spec:
+  crd:
+    spec:
+      names:
+        kind: NotLatestImage
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package notlatestimage
+
+        violation[{"msg": msg}]{
+          input.review.object.kind == "Pod"
+          imagetag := input.review.object.spec.containers[_].image
+          endswith(imagetag,"latest")
+          msg := "Can't use image of latest tag !!"
+        }
+```
+
+```sh
+cat ochacafe-s5-3/opa/constraints.yaml
+```
+```sh
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: NotLatestImage
+metadata:
+  name: notlatestimage
+spec:
+  match:
+    kinds:
+    - apiGroups: [""]
+      kinds: ["Pod"]
+```
+
+```sh
+kubectl apply -f ochacafe-s5-3/opa/constrainttemplate.yaml
+```
+```sh
+constrainttemplate.templates.gatekeeper.sh/notlatestimage created
+```
+
+```sh
+kubectl apply -f ochacafe-s5-3/opa/constraints.yaml
+```
+```sh
+notlatestimage.constraints.gatekeeper.sh/notlatestimage created
+```
+
+### 3. latestタグを使用したマニフェストを適用してERROR確認(k8s-manage)
+
+```sh
+cat ochacafe-s5-3/opa/banlataest.yaml
+```
+```sh
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nginx-latest
+spec:
+  containers:
+  - name: nginx-latesttag
+    image: nginx:latest
+```
+
+```sh
+kubectl apply -f ochacafe-s5-3/opa/banlataest.yaml
+```
+```sh
+Error from server ([notlatestimage] Can't use image of latest tag !!): error when creating "ochacafe-s5-3/opa/banlataest.yaml": admission webhook "validation.gatekeeper.sh" denied the request: [notlatestimage] Can't use image of latest tag !!
+```
+
+## Container Runtime Sandboxes
+
+### 1.kube-apiserverのAdmission ControlでRuntimeClassを有効化する(k8s-control-plane)
+
+```sh
+vim /etc/kubernetes/manifests/kube-apiserver.yaml
+```
+```sh
+・
+・（省略）
+・
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --advertise-address=10.0.0.2
+    - --allow-privileged=true
+    - --authorization-mode=Node,RBAC
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt
+    - --enable-admission-plugins=NodeRestriction,PodSecurityPolicy,RuntimeClass
+・
+・（省略）
+・
+```
+
+Control Planeからexit
+
+```sh
+exit
+```
+```sh
+logout
+```
+```sh
+exit
+```
+```sh
+logout
+Connection to 144.21.***.*** closed.
+```
+
+### 2.gVisorのRuntimeClassマニフェストの作成および適用(k8s-manage)
+
+```sh
+cat ochacafe-s5-3/runtimeclass/runtimeclass.yaml
+```
+```sh
+apiVersion: node.k8s.io/v1beta1
+kind: RuntimeClass
+metadata:
+  name: gvisor
+handler: runsc
+```
+
+```sh
+kubectl apply -f ochacafe-s5-3/runtimeclass/runtimeclass.yaml
+```
+```sh
+Warning: node.k8s.io/v1beta1 RuntimeClass is deprecated in v1.22+, unavailable in v1.25+
+runtimeclass.node.k8s.io/gvisor created
+```
+
+### 3.Nginx PodをgVisor指定して起動(k8s-manage)
+
+```sh
+cat ochacafe-s5-3/runtimeclass/gvisor-nginx.yaml
+```
+```sh
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: null
+  labels:
+    run: gvisor-nginx
+  name: gvisor-nginx
+spec:
+  runtimeClassName: gvisor
+  containers:
+  - image: nginx:1.21
+    name: gvisor-nginx
+    resources: {}
+  dnsPolicy: ClusterFirst
+  restartPolicy: Never
+status: {}
+```
+
+```sh
+kubectl apply -f ochacafe-s5-3/runtimeclass/gvisor-nginx.yaml
+```
+```sh
+pod/gvisor-nginx created
+```
+
+「gvisor-nginx」 Pod に接続して、gVisor 起動を確認
+
+```sh
+kubectl exec -it gvisor-nginx -- /bin/bash
+```
+```sh
+dmesg
+```
+```sh
+[    0.000000] Starting gVisor...
+[    0.168305] Creating cloned children...
+[    0.433689] Creating bureaucratic processes...
+[    0.491369] Daemonizing children...
+[    0.798069] Mounting deweydecimalfs...
+[    0.897569] Searching for needles in stacks...
+[    0.967286] Reading process obituaries...
+[    1.027207] Synthesizing system calls...
+[    1.342101] Checking naughty and nice process list...
+[    1.749487] Recruiting cron-ies...
+[    2.123900] Singleplexing /dev/ptmx...
+[    2.534325] Ready!
+```
+```sh
+exit
+```
+
+```sh
+kubectl delete pod gvisor-nginx
+```
+```sh
+pod "gvisor-nginx" deleted
+```
+
+# Kubernetes Security - Supply Chain Security -
+
+## Trivy
+
+### 1.Trivyのダウンロード(k8s-manage)
+
+```sh
+curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.24.0
+```
+```sh
+aquasecurity/trivy info checking GitHub for tag 'v0.24.0'
+aquasecurity/trivy info found version: 0.24.0 for v0.24.0/Linux/ARM64
+aquasecurity/trivy info installed /usr/local/bin/trivy
+```
+
+```sh
+trivy -v
+```
+```sh
+Version: 0.24.0
+```
+
+サンプルPodのデプロイ
+
+```sh
+kubectl apply -f ochacafe-s5-3/trivy/
+```
+```sh
+pod/oraclelinux created
+deployment.apps/sample-go-app created
+service/sample-go-app-service created
+pod/ubuntu created
+```
+
+### 2.稼働しているPod内のコンテナイメージを確認(k8s-manage)
+
+```sh
+kubectl get pods
+```
+```sh
+NAME                             READY   STATUS    RESTARTS   AGE
+oraclelinux                      1/1     Running   0          4m13s
+sample-go-app-548b756854-7m4xr   1/1     Running   0          4m13s
+ubuntu                           1/1     Running   0          4m13s
+```
+
+```sh
+kubectl get pods -o yaml | grep image:
+```
+```sh
+      image: oraclelinux:8.5
+      image: docker.io/library/oraclelinux:8.5
+    - image: icn.ocir.io/orasejapan/ochacafe5-3:arm
+      image: icn.ocir.io/orasejapan/ochacafe5-3:arm
+    - image: nginx:1.21.5
+      image: docker.io/library/nginx:1.21.5
+    - image: nginx:1.21.5
+      image: docker.io/library/nginx:1.21.5
+      image: ubuntu:21.10
+      image: docker.io/library/ubuntu:21.10
+```
+
+### 3.Trivyでスキャンをかけて、HIGHとCRITICALが表示されるイメージを見つける(k8s-manage)
+
+初回は、DBダウンロードから始まる。
+
+```sh
+trivy image --severity HIGH,CRITICAL docker.io/library/oraclelinux:8.5
+```
+```sh
+2022-03-03T07:16:28.996Z        INFO    Need to update DB
+2022-03-03T07:16:28.998Z        INFO    Downloading DB...
+29.73 MiB / 29.73 MiB [--------------------------------------------------------------------------------------------------------------------------------------] 100.00% 25.27 MiB p/s 1.4s
+2022-03-03T07:16:36.774Z        INFO    Detected OS: oracle
+2022-03-03T07:16:36.775Z        INFO    Detecting Oracle Linux vulnerabilities...
+2022-03-03T07:16:36.781Z        INFO    Number of language-specific files: 0
+
+docker.io/library/oraclelinux:8.5 (oracle 8.5)
+==============================================
+Total: 0 (HIGH: 0, CRITICAL: 0)
+```
+
+```sh
+trivy image --severity HIGH,CRITICAL docker.io/library/ubuntu:21.10
+```
+```sh
+2022-03-03T07:18:51.413Z        INFO    Detected OS: ubuntu
+2022-03-03T07:18:51.414Z        INFO    Detecting Ubuntu vulnerabilities...
+2022-03-03T07:18:51.417Z        INFO    Number of language-specific files: 0
+
+docker.io/library/ubuntu:21.10 (ubuntu 21.10)
+=============================================
+Total: 0 (HIGH: 0, CRITICAL: 0)
+```
+
+HIGHとCRITICALが表示される。
+
+```sh
+trivy image --severity HIGH,CRITICAL icn.ocir.io/orasejapan/ochacafe5-3:arm
+```
+```sh
+2022-03-03T07:19:27.161Z        INFO    Detected OS: debian
+2022-03-03T07:19:27.162Z        INFO    Detecting Debian vulnerabilities...
+2022-03-03T07:19:27.167Z        INFO    Number of language-specific files: 1
+
+icn.ocir.io/orasejapan/ochacafe5-3:arm (debian 11.2)
+====================================================
+Total: 4 (HIGH: 1, CRITICAL: 3)
+
++---------+------------------+----------+-------------------+---------------+---------------------------------------+
+| LIBRARY | VULNERABILITY ID | SEVERITY | INSTALLED VERSION | FIXED VERSION |                 TITLE                 |
++---------+------------------+----------+-------------------+---------------+---------------------------------------+
+| libc6   | CVE-2021-33574   | CRITICAL | 2.31-13+deb11u2   |               | glibc: mq_notify does                 |
+|         |                  |          |                   |               | not handle separately                 |
+|         |                  |          |                   |               | allocated thread attributes           |
+|         |                  |          |                   |               | -->avd.aquasec.com/nvd/cve-2021-33574 |
++         +------------------+          +                   +---------------+---------------------------------------+
+|         | CVE-2022-23218   |          |                   |               | glibc: Stack-based buffer overflow    |
+|         |                  |          |                   |               | in svcunix_create via long pathnames  |
+|         |                  |          |                   |               | -->avd.aquasec.com/nvd/cve-2022-23218 |
++         +------------------+          +                   +---------------+---------------------------------------+
+|         | CVE-2022-23219   |          |                   |               | glibc: Stack-based buffer             |
+|         |                  |          |                   |               | overflow in sunrpc clnt_create        |
+|         |                  |          |                   |               | via a long pathname                   |
+|         |                  |          |                   |               | -->avd.aquasec.com/nvd/cve-2022-23219 |
++         +------------------+----------+                   +---------------+---------------------------------------+
+|         | CVE-2021-3999    | HIGH     |                   |               | glibc: Off-by-one buffer              |
+|         |                  |          |                   |               | overflow/underflow in getcwd()        |
+|         |                  |          |                   |               | -->avd.aquasec.com/nvd/cve-2021-3999  |
++---------+------------------+----------+-------------------+---------------+---------------------------------------+
+```
+
+# Kubernetes Security - Monitoring, Logging and Runtime Security -
+
+## Falco
+
+### 1.Falco のインストール(k8s-node-k)
+
+```sh
+curl -s https://falco.org/repo/falcosecurity-3672BA8F.asc | apt-key add -
+```
+```sh
+OK
+```
+
+```sh
+echo "deb https://download.falco.org/packages/deb stable main" | tee -a /etc/apt/sources.list.d/falcosecurity.list
+```
+```sh
+deb https://download.falco.org/packages/deb stable main
+```
+
+```sh
+apt-get update -y
+```
+
+```sh
+apt-get -y install linux-headers-$(uname -r)
+```
+
+```sh
+apt-get install -y falco
+```
+
+### 2.テスト用のPodを起動後、Pod（コンテナ）内でルール違反をして、ログを確認(k8s-manage-k)
+
+```sh
+kubectl apply -f ochacafe-s5-3/falco/httpd.yaml
+```
+```sh
+pod/apache created
+```
+
+```sh
+kubectl exec -it apache  -- touch /etc/test.conf
+```
+
+Node側で「/var/log/syslog」に出力される Falco のログを確認
+
+```sh
+cat /var/log/syslog | grep falco
+```
+```sh
+・
+・（省略）
+・
+Mar  3 11:01:31 k8s-node-k-945573 falco: 11:01:31.183863989: Error File below /etc opened for writing (user=root user_loginuid=-1 command=touch /etc/test.conf parent=<NA> pcmdline=<NA> file=/etc/test.conf program=touch gparent=<NA> ggparent=<NA> gggparent=<NA> container_id=a723e15034a5 image=docker.io/library/httpd)
+・
+・（省略）
+・
+```
+
+Nodeの「/etc/」ディレクトリ配下に作った場合のSyslog
+
+```sh
+touch /etc/test2.conf
+```
+
+```sh
+cat /var/log/syslog | grep falco
+```
+```sh
+・
+・（省略）
+・
+Mar  3 11:11:57 k8s-node-k-945573 falco: 11:11:57.885578617: Error File below /etc opened for writing (user=root user_loginuid=1001 command=touch /etc/test2.conf parent=bash pcmdline=bash file=/etc/test2.conf program=touch gparent=sudo ggparent=bash gggparent=node container_id=host image=<NA>)
+・
+・（省略）
+・
+```
+
+ルール定義を確認
+
+```sh
+vim /etc/falco/falco_rules.yaml 
+```
+```sh
+・
+・（省略）
+・
+- rule: Write below etc
+  desc: an attempt to write to any file below /etc
+  condition: write_etc_common
+  output: "File below /etc opened for writing (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline parent=%proc.pname pcmdline=%proc.pcmdline file=%fd.name program=%proc.name gparent=%proc.aname[2] ggparent=%proc.aname[3] gggparent=%proc.aname[4] container_id=%container.id image=%container.image.repository)"
+  priority: ERROR
+  tags: [filesystem, mitre_persistence]
+・
+・（省略）
+・
 ```
