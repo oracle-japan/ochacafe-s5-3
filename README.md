@@ -1066,43 +1066,6 @@ namespace-clusterrole                                                  2022-03-0
 
 ServiceAccout namespace-saでは、defaultのNamespaceでNamespaceの一覧のみ取得が許可されているので、Namespaceを作成しようとするとエラーとなる。
 
-```sh
-kubectl create clusterrolebinding namespace-clusterrolebinding --clusterrole namespace-clusterrole --serviceaccount default:namespace-sa -o yaml --dry-run=client > namespace-clusterrolebinding.yaml
-```
-
-```sh
-cat namespace-clusterrolebinding.yaml
-```
-```sh
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  creationTimestamp: null
-  name: namespace-clusterrolebinding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: namespace-clusterrole
-subjects:
-- kind: ServiceAccount
-  name: namespace-sa
-  namespace: default
-```
-
-```sh
-kubectl apply -f namespace-clusterrolebinding.yaml
-```
-```sh
-clusterrolebinding.rbac.authorization.k8s.io/namespace-clusterrolebinding created
-```
-
-```sh
-kubectl get clusterrolebindings | grep namespace-clusterrolebinding
-```
-```sh
-namespace-clusterrolebinding                           ClusterRole/namespace-clusterrole                                                  45s
-```
-
 Namespaceの一覧を取得
 
 ```sh
@@ -1196,7 +1159,7 @@ Connection to 144.21.***.*** closed.
 ### 4.AppArmor Profileのアノテーションを定義したマニフェストの作成(k8s-manage)
 
 ```sh
-cat ochacafe-s5-3/apparomor/hello-apparomor.yaml
+cat ochacafe-s5-3/apparmor/hello-apparmor.yaml
 ```
 ```sh
 apiVersion: v1
