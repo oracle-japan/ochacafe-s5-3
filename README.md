@@ -7,7 +7,7 @@ Ochacafe5 #3 Kubernetes Security
 
 事前に以下のスペックで仮想マシンを作成して、SSHログイン可能な状態にしておきます。
 
-![概要図](images/001.png)
+![概要図](images/001.jpg)
 
 ![仮想マシン](images/002.png)
 
