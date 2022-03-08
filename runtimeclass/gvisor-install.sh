@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # https://gvisor.dev/docs/user_guide/install
 
-
 # gvisor
 sudo apt-get update && \
 sudo apt-get install -y \
@@ -10,7 +9,6 @@ sudo apt-get install -y \
     curl \
     gnupg-agent \
     software-properties-common
-
 
 # install from web
 (
@@ -26,7 +24,6 @@ sudo apt-get install -y \
   chmod a+rx runsc containerd-shim-runsc-v1
   sudo mv runsc containerd-shim-runsc-v1 /usr/local/bin
 )
-
 
 # containerd enable runsc
 cat > /etc/containerd/config.toml <<EOF
