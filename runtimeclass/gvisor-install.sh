@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# IF THIS FAILS then you can try to change the URL= further down from specific to the latest release
 # https://gvisor.dev/docs/user_guide/install
 
 
@@ -17,7 +16,7 @@ sudo apt-get install -y \
 (
   set -e
   ARCH=$(uname -m)
-  URL=https://storage.googleapis.com/gvisor/releases/release/20210806/${ARCH}
+  URL=https://storage.googleapis.com/gvisor/releases/release/20220228/${ARCH}
   # URL=https://storage.googleapis.com/gvisor/releases/release/latest/${ARCH} # TRY THIS URL INSTEAD IF THE SCRIPT DOESNT WORK FOR YOU
   wget ${URL}/runsc ${URL}/runsc.sha512 \
     ${URL}/containerd-shim-runsc-v1 ${URL}/containerd-shim-runsc-v1.sha512
