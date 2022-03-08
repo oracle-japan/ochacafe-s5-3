@@ -1807,6 +1807,8 @@ pod "nginx-e" deleted
 
 ## Open Policy Agent
 
+※以下手順は、arm環境において、OPAのポリシーが適用しない事象が発生します。試す場合はOKEなど別のクラスタを構築して実行してください。
+
 ### 1.Gatekeeperインストール(k8s-manage)
 
 ```sh
@@ -2193,6 +2195,8 @@ pod "ubuntu" deleted
 
 ## Falco
 
+※Falcoはarmをサポートしていないので、試す場合は、amdとして同じ環境を作成する必要があります。
+
 ### 1.Falco のインストール(k8s-node-k)
 
 ```sh
@@ -2221,6 +2225,22 @@ apt-get -y install linux-headers-$(uname -r)
 apt-get install -y falco
 ```
 
+Nodeからexit
+
+```sh
+exit
+```
+```sh
+logout
+```
+```sh
+exit
+```
+```sh
+logout
+Connection to 144.21.***.*** closed.
+```
+
 ### 2.テスト用のPodを起動後、Pod（コンテナ）内でルール違反をして、ログを確認(k8s-manage-k)
 
 ```sh
@@ -2233,6 +2253,8 @@ pod/apache created
 ```sh
 kubectl exec -it apache  -- touch /etc/test.conf
 ```
+
+Nodeにログイン
 
 Node側で「/var/log/syslog」に出力される Falco のログを確認
 
@@ -2286,4 +2308,20 @@ vim /etc/falco/falco_rules.yaml
 ・
 ・（省略）
 ・
+```
+
+Nodeからexit
+
+```sh
+exit
+```
+```sh
+logout
+```
+```sh
+exit
+```
+```sh
+logout
+Connection to 144.21.***.*** closed.
 ```
