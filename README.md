@@ -1194,7 +1194,7 @@ NAME                      READY   STATUS      RESTARTS   AGE
 hello-apparmor            1/1     Running     0          26s
 ```
 
-コンテナがこのプロファイルで実際に実行されていることを確認するために、コンテナのproc attrをチェック。
+コンテナがこのプロファイルで実際に実行されていることを確認するために、コンテナの「/proc/attr/」をチェック。
 
 ```sh
 kubectl exec hello-apparmor -- cat /proc/1/attr/current
@@ -1648,7 +1648,7 @@ PodSecurityPolicyへの権限を持つadminはPod作成できるが、権限を�
 )で公開されている制限ポリシーをベースとしたマニフェストを利用して適用。
 
 ```sh
-kubectl-admin apply -f restricted-psp.yaml
+kubectl-admin apply -f ochacafe-s5-3/psp/restricted-psp.yaml
 ```
 ```sh
 podsecuritypolicy.policy/restricted-psp created
@@ -1793,6 +1793,16 @@ nginx-a        1/1     Running                      0          39m
 nginx-c        1/1     Running                      0          25m
 nginx-d        0/1     CreateContainerConfigError   0          5m49s
 nginx-e        1/1     Running                      0          47s
+```
+
+```sh
+sh ochacafe-s5-3/psp/nginx-delete.sh
+```
+```sh
+pod "nginx-a" deleted
+pod "nginx-c" deleted
+pod "nginx-d" deleted
+pod "nginx-e" deleted
 ```
 
 ## Open Policy Agent
@@ -2167,6 +2177,16 @@ Total: 4 (HIGH: 1, CRITICAL: 3)
 |         |                  |          |                   |               | overflow/underflow in getcwd()        |
 |         |                  |          |                   |               | -->avd.aquasec.com/nvd/cve-2021-3999  |
 +---------+------------------+----------+-------------------+---------------+---------------------------------------+
+```
+
+```sh
+kubectl delete -f ochacafe-s5-3/trivy/
+```
+```sh
+pod "oraclelinux" deleted
+deployment.apps "sample-go-app" deleted
+service "sample-go-app-service" deleted
+pod "ubuntu" deleted
 ```
 
 # Kubernetes Security - Monitoring, Logging and Runtime Security -
