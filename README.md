@@ -410,6 +410,8 @@ kubectl exec -it sample-pod-1 -- /bin/bash
 ```
 ```sh
 curl 192.168.173.130
+```
+```sh
 <!DOCTYPE html>
 <html>
 <head>
