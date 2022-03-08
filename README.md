@@ -460,7 +460,7 @@ kubectl apply -f ochacafe-s5-3/networkpolicy/sp-namespace-allow-networkpolicy.ya
 networkpolicy.networking.k8s.io/sp-namespace-allow-networkpolicy created
 ```
 
-#### 「sample-pod-1」から「sample-pod-2」から、「sample-pod-3」へのアクセスは可、「sample-pod-4」へのアクセスは不可
+#### 「sample-pod-1」と「sample-pod-2」から、「sample-pod-3」へのアクセスは可、「sample-pod-4」へのアクセスは不可
 
 ```sh
 kubectl exec -it sample-pod-1 -- /bin/bash
