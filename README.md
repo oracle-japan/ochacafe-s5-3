@@ -1,9 +1,10 @@
-# ochacafe-s5-3
-Ochacafe5 #3 Kubernetes Security
+# Oracle Hangout Cafe Season 5 #3 Kubernetes Security
 
-デモ環境の構築方法、資材置き場です。
+セッション時に使用したデモ環境の構築手順および資材置き場です。
 
 # Kubernetes Cluster 構築
+
+環境は、Oracle Cloud Infrastructure（OCI）前提となります。
 
 事前に以下のスペックで仮想マシンを作成して、SSHログイン可能な状態にしておきます。
 
