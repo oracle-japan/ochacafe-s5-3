@@ -1582,6 +1582,8 @@ alias kubectl-edit='kubectl --as=system:serviceaccount:default:edit-user'
 
 ### 1.PodSecurityPolicyの許可ポリシーを適用(k8s-manage)
 
+![](images/012.jpg)
+
 [公式ドキュメント](https://kubernetes.io/docs/concepts/policy/pod-security-policy/#example-policies
 )で公開されている許可ポリシーを利用して適用。
 
@@ -1661,6 +1663,8 @@ Error from server (Forbidden): pods "nginx-b" is forbidden: PodSecurityPolicy: u
 PodSecurityPolicyへの権限を持つadminはPod作成できるが、権限を持たないeditでは作成できない。
 
 ### 2.PodSecurityPolicyの制限ポリシーを適用(k8s-manage)
+
+![](images/013.jpg)
 
 [公式ドキュメント](https://kubernetes.io/docs/concepts/policy/pod-security-policy/#example-policies
 )で公開されている制限ポリシーをベースとしたマニフェストを利用して適用。
