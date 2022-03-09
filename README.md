@@ -1999,6 +1999,8 @@ pod "nginx-e" deleted
 
 ### 1.kube-apiserverのAdmission ControlでRuntimeClassを有効化する(k8s-control-plane)
 
+※後続手順に影響が出るため、「PodSecurityPolicy」は削除しておきます。
+
 ```sh
 vim /etc/kubernetes/manifests/kube-apiserver.yaml
 ```
@@ -2014,7 +2016,7 @@ spec:
     - --allow-privileged=true
     - --authorization-mode=Node,RBAC
     - --client-ca-file=/etc/kubernetes/pki/ca.crt
-    - --enable-admission-plugins=NodeRestriction,PodSecurityPolicy,RuntimeClass
+    - --enable-admission-plugins=NodeRestriction,RuntimeClass
 ・
 ・（省略）
 ・
