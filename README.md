@@ -812,6 +812,13 @@ NAME                      READY   STATUS      RESTARTS   AGE
 kube-bench-master-64mwj   0/1     Completed   0          40s
 ```
 
+```sh
+kubectl delete -f ochacafe-s5-3/kube-bench/job-master.yaml
+```
+```sh
+job.batch "kube-bench-master" deleted
+```
+
 ### 3. 結果の確認
 
 CompletedしたPodのログを確認
