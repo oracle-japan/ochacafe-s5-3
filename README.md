@@ -1078,6 +1078,45 @@ namespace-clusterrole                                                  2022-03-0
 
 #### 「namespace-clusterrolebinding」というclusterrolebindingの作成及び「namespace-sa」というServiceAccountと紐づける
 
+```sh
+kubectl create clusterrolebinding namespace-clusterrolebinding --clusterrole namespace-clusterrole --serviceaccount default:namespace-sa -o yaml --dry-run=client > namespace-clusterrolebinding.yaml
+```
+```sh
+
+```
+
+```sh
+cat namespace-clusterrolebinding.yaml
+```
+```sh
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: namespace-clusterrolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: namespace-clusterrole
+subjects:
+- kind: ServiceAccount
+  name: namespace-sa
+  namespace: default
+```
+
+```sh
+kubectl apply -f namespace-clusterrolebinding.yaml
+```
+```sh
+clusterrolebinding.rbac.authorization.k8s.io/namespace-clusterrolebinding created
+```
+
+```sh
+kubectl get clusterrolebindings | grep namespace-clusterrolebinding
+```
+```sh
+namespace-clusterrolebinding                           ClusterRole/namespace-clusterrole                                                  12s
+```
+
 ServiceAccout namespace-saでは、defaultのNamespaceでNamespaceの一覧のみ取得が許可されているので、Namespaceを作成しようとするとエラーとなる。
 
 namespace-saサービスアカウントでNamespaceの一覧を取得
