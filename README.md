@@ -287,8 +287,6 @@ git clone https://github.com/oracle-japan/ochacafe-s5-3.git
 
 ### 1.全ての送信トラフィックを許可、受信トラフィックは拒否
 
-![全ての送信トラフィックを許可、受信トラフィックは拒否](images/003.jpg)
-
 #### サンプルPodとNamespaceの作成
 
 ```sh
@@ -336,6 +334,8 @@ tigera-operator    Active   72m
 ```
 
 #### Namespace「default」と「test」に「egress-only-allow-networkpoplicy.yaml」を適用
+
+![全ての送信トラフィックを許可、受信トラフィックは拒否](images/003.jpg)
 
 ```sh
 kubectl apply -f ochacafe-s5-3/networkpolicy/egress-only-allow-networkpolicy.yaml
