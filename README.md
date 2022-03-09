@@ -287,6 +287,8 @@ git clone https://github.com/oracle-japan/ochacafe-s5-3.git
 
 ### 1.全ての送信トラフィックを許可、受信トラフィックは拒否
 
+![全ての送信トラフィックを許可、受信トラフィックは拒否](images/003.jpg)
+
 #### サンプルPodとNamespaceの作成
 
 ```sh
@@ -394,6 +396,8 @@ exit
 
 ### 2.「app: pod1」から「app: pod2」のみ受信許可
 
+![「app: pod1」から「app: pod2」のみ受信許可](images/004.jpg)
+
 #### 「sp-pod-allow-networkpolicy.yaml」を適用
 
 ```sh
@@ -450,6 +454,8 @@ exit
 ```
 
 ### 3.Namespace defaultのPodから「app: pod3」のみ受信許可
+
+![Namespace defaultのPodから「app: pod3」のみ受信許可](images/005.jpg)
 
 #### 「sp-namespace-allow-networkpolicy.yaml」の適用
 
@@ -554,7 +560,9 @@ kubectl delete -f ochacafe-s5-3/networkpolicy/sp-namespace-allow-networkpolicy.y
 networkpolicy.networking.k8s.io/sp-namespace-allow-networkpolicy delete
 ```
 
-### 4. 特定のIP Podから「app: pod3」のみ受信許可
+### 4.特定のIP Podから「app: pod3」のみ受信許可
+
+![特定のIP Podから「app: pod3」のみ受信許可](images/006.jpg)
 
 #### 「sp-ip-allow-networkpolicy.yaml」の適用
 
@@ -1095,6 +1103,8 @@ Error from server (Forbidden): namespaces is forbidden: User "system:serviceacco
 
 ## AppArmor
 
+![AppArmor](images/007.jpg)
+
 ### 1.Nodeに接続して、apparmorが有効か確認(k8s-node)
 
 「Y」と表示されれば有効状態
@@ -1225,6 +1235,8 @@ pod "hello-apparmor" deleted
 ```
 
 ## Seccomp
+
+![Seccomp](images/007.jpg)
 
 ### 1.Nodeに接続して、seccompが有効か確認(k8s-node)
 
@@ -1924,6 +1936,8 @@ Error from server ([notlatestimage] Can't use image of latest tag !!): error whe
 ```
 
 ## Container Runtime Sandboxes
+
+![RuntimeClass](images/009.jpg)
 
 ### 1.kube-apiserverのAdmission ControlでRuntimeClassを有効化する(k8s-control-plane)
 
