@@ -1524,6 +1524,126 @@ kubectl delete -f ochacafe-s5-3/securitycontext/both-test.yaml
 pod "both-test" deleted
 ```
 
+## Open Policy Agent
+
+※以下手順は、arm環境において、OPAのポリシーが適用しない事象が発生します。試す場合はOKEなど別のクラスタを構築して実行してください。
+
+### 1.Gatekeeperインストール(k8s-manage)
+
+```sh
+kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/v3.7.1/deploy/gatekeeper.yaml
+```
+```sh
+namespace/gatekeeper-system created
+resourcequota/gatekeeper-critical-pods created
+customresourcedefinition.apiextensions.k8s.io/assign.mutations.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/assignmetadata.mutations.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/configs.config.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/constraintpodstatuses.status.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/constrainttemplatepodstatuses.status.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/constrainttemplates.templates.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/modifyset.mutations.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/mutatorpodstatuses.status.gatekeeper.sh created
+customresourcedefinition.apiextensions.k8s.io/providers.externaldata.gatekeeper.sh created
+serviceaccount/gatekeeper-admin created
+Warning: policy/v1beta1 PodSecurityPolicy is deprecated in v1.21+, unavailable in v1.25+
+podsecuritypolicy.policy/gatekeeper-admin created
+role.rbac.authorization.k8s.io/gatekeeper-manager-role created
+clusterrole.rbac.authorization.k8s.io/gatekeeper-manager-role created
+rolebinding.rbac.authorization.k8s.io/gatekeeper-manager-rolebinding created
+clusterrolebinding.rbac.authorization.k8s.io/gatekeeper-manager-rolebinding created
+secret/gatekeeper-webhook-server-cert created
+service/gatekeeper-webhook-service created
+deployment.apps/gatekeeper-audit created
+deployment.apps/gatekeeper-controller-manager created
+Warning: policy/v1beta1 PodDisruptionBudget is deprecated in v1.21+, unavailable in v1.25+; use policy/v1 PodDisruptionBudget
+poddisruptionbudget.policy/gatekeeper-controller-manager created
+mutatingwebhookconfiguration.admissionregistration.k8s.io/gatekeeper-mutating-webhook-configuration created
+validatingwebhookconfiguration.admissionregistration.k8s.io/gatekeeper-validating-webhook-configuration created
+```
+
+### 2.ConstraintTemplateの作成と適用(k8s-manage)
+
+```sh
+cat ochacafe-s5-3/opa/constrainttemplate.yaml
+```
+```sh
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: notlatestimage
+spec:
+  crd:
+    spec:
+      names:
+        kind: NotLatestImage
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package notlatestimage
+
+        violation[{"msg": msg}]{
+          input.review.object.kind == "Pod"
+          imagetag := input.review.object.spec.containers[_].image
+          endswith(imagetag,"latest")
+          msg := "Can't use image of latest tag !!"
+        }
+```
+
+```sh
+cat ochacafe-s5-3/opa/constraints.yaml
+```
+```sh
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: NotLatestImage
+metadata:
+  name: notlatestimage
+spec:
+  match:
+    kinds:
+    - apiGroups: [""]
+      kinds: ["Pod"]
+```
+
+```sh
+kubectl apply -f ochacafe-s5-3/opa/constrainttemplate.yaml
+```
+```sh
+constrainttemplate.templates.gatekeeper.sh/notlatestimage created
+```
+
+```sh
+kubectl apply -f ochacafe-s5-3/opa/constraints.yaml
+```
+```sh
+notlatestimage.constraints.gatekeeper.sh/notlatestimage created
+```
+
+### 3. latestタグを使用したマニフェストを適用してERROR確認(k8s-manage)
+
+```sh
+cat ochacafe-s5-3/opa/banlataest.yaml
+```
+```sh
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nginx-latest
+spec:
+  containers:
+  - name: nginx-latesttag
+    image: nginx:latest
+```
+
+```sh
+kubectl apply -f ochacafe-s5-3/opa/banlataest.yaml
+```
+```sh
+Error from server ([notlatestimage] Can't use image of latest tag !!): error when creating "ochacafe-s5-3/opa/banlataest.yaml": admission webhook "validation.gatekeeper.sh" denied the request: [notlatestimage] Can't use image of latest tag !!
+```
+
+## PodSecurityPolicy
+
 ### 事前準備
 
 ### 1.kube-apiserverのAdmission ControlでPodSecurityPolicyを有効化する(k8s-control-plane)
@@ -1873,124 +1993,6 @@ pod "nginx-d" deleted
 pod "nginx-e" deleted
 ```
 
-## Open Policy Agent
-
-※以下手順は、arm環境において、OPAのポリシーが適用しない事象が発生します。試す場合はOKEなど別のクラスタを構築して実行してください。
-
-### 1.Gatekeeperインストール(k8s-manage)
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/open-policy-agent/gatekeeper/v3.7.1/deploy/gatekeeper.yaml
-```
-```sh
-namespace/gatekeeper-system created
-resourcequota/gatekeeper-critical-pods created
-customresourcedefinition.apiextensions.k8s.io/assign.mutations.gatekeeper.sh created
-customresourcedefinition.apiextensions.k8s.io/assignmetadata.mutations.gatekeeper.sh created
-customresourcedefinition.apiextensions.k8s.io/configs.config.gatekeeper.sh created
-customresourcedefinition.apiextensions.k8s.io/constraintpodstatuses.status.gatekeeper.sh created
-customresourcedefinition.apiextensions.k8s.io/constrainttemplatepodstatuses.status.gatekeeper.sh created
-customresourcedefinition.apiextensions.k8s.io/constrainttemplates.templates.gatekeeper.sh created
-customresourcedefinition.apiextensions.k8s.io/modifyset.mutations.gatekeeper.sh created
-customresourcedefinition.apiextensions.k8s.io/mutatorpodstatuses.status.gatekeeper.sh created
-customresourcedefinition.apiextensions.k8s.io/providers.externaldata.gatekeeper.sh created
-serviceaccount/gatekeeper-admin created
-Warning: policy/v1beta1 PodSecurityPolicy is deprecated in v1.21+, unavailable in v1.25+
-podsecuritypolicy.policy/gatekeeper-admin created
-role.rbac.authorization.k8s.io/gatekeeper-manager-role created
-clusterrole.rbac.authorization.k8s.io/gatekeeper-manager-role created
-rolebinding.rbac.authorization.k8s.io/gatekeeper-manager-rolebinding created
-clusterrolebinding.rbac.authorization.k8s.io/gatekeeper-manager-rolebinding created
-secret/gatekeeper-webhook-server-cert created
-service/gatekeeper-webhook-service created
-deployment.apps/gatekeeper-audit created
-deployment.apps/gatekeeper-controller-manager created
-Warning: policy/v1beta1 PodDisruptionBudget is deprecated in v1.21+, unavailable in v1.25+; use policy/v1 PodDisruptionBudget
-poddisruptionbudget.policy/gatekeeper-controller-manager created
-mutatingwebhookconfiguration.admissionregistration.k8s.io/gatekeeper-mutating-webhook-configuration created
-validatingwebhookconfiguration.admissionregistration.k8s.io/gatekeeper-validating-webhook-configuration created
-```
-
-### 2.ConstraintTemplateの作成と適用(k8s-manage)
-
-```sh
-cat ochacafe-s5-3/opa/constrainttemplate.yaml
-```
-```sh
-apiVersion: templates.gatekeeper.sh/v1beta1
-kind: ConstraintTemplate
-metadata:
-  name: notlatestimage
-spec:
-  crd:
-    spec:
-      names:
-        kind: NotLatestImage
-  targets:
-    - target: admission.k8s.gatekeeper.sh
-      rego: |
-        package notlatestimage
-
-        violation[{"msg": msg}]{
-          input.review.object.kind == "Pod"
-          imagetag := input.review.object.spec.containers[_].image
-          endswith(imagetag,"latest")
-          msg := "Can't use image of latest tag !!"
-        }
-```
-
-```sh
-cat ochacafe-s5-3/opa/constraints.yaml
-```
-```sh
-apiVersion: constraints.gatekeeper.sh/v1beta1
-kind: NotLatestImage
-metadata:
-  name: notlatestimage
-spec:
-  match:
-    kinds:
-    - apiGroups: [""]
-      kinds: ["Pod"]
-```
-
-```sh
-kubectl apply -f ochacafe-s5-3/opa/constrainttemplate.yaml
-```
-```sh
-constrainttemplate.templates.gatekeeper.sh/notlatestimage created
-```
-
-```sh
-kubectl apply -f ochacafe-s5-3/opa/constraints.yaml
-```
-```sh
-notlatestimage.constraints.gatekeeper.sh/notlatestimage created
-```
-
-### 3. latestタグを使用したマニフェストを適用してERROR確認(k8s-manage)
-
-```sh
-cat ochacafe-s5-3/opa/banlataest.yaml
-```
-```sh
-apiVersion: v1
-kind: Pod
-metadata:
-  name: pod-nginx-latest
-spec:
-  containers:
-  - name: nginx-latesttag
-    image: nginx:latest
-```
-
-```sh
-kubectl apply -f ochacafe-s5-3/opa/banlataest.yaml
-```
-```sh
-Error from server ([notlatestimage] Can't use image of latest tag !!): error when creating "ochacafe-s5-3/opa/banlataest.yaml": admission webhook "validation.gatekeeper.sh" denied the request: [notlatestimage] Can't use image of latest tag !!
-```
-
 ## Container Runtime Sandboxes
 
 ![RuntimeClass](images/009.jpg)
@@ -2117,6 +2119,13 @@ kubectl delete pod gvisor-nginx
 ```
 ```sh
 pod "gvisor-nginx" deleted
+```
+
+```sh
+kubectl delete -f ochacafe-s5-3/runtimeclass/runtimeclass.yaml
+```
+```sh
+runtimeclass.node.k8s.io "gvisor" deleted
 ```
 
 # Kubernetes Security - Supply Chain Security -
