@@ -894,6 +894,8 @@ job.batch "kube-bench-master" deleted
 
 ### 1.roleとrolebinding(k8s-manage)
 
+![roleとrolebinding](images/010.jpg)
+
 #### 「pod-sa」というServiceAccountを作成
 
 ```sh
@@ -993,7 +995,9 @@ NAME              ROLE            AGE
 pod-rolebinding   Role/pod-role   45s
 ```
 
-Podの一覧を取得
+ServiceAccout pod-saでは、Podの一覧取得のみ許可されているので、Podを作成しようとするとエラーとなる。
+
+pod-saサービスアカウントでPodの一覧を取得
 
 ```sh
 kubectl --as=system:serviceaccount:default:pod-sa get pods
@@ -1002,7 +1006,7 @@ kubectl --as=system:serviceaccount:default:pod-sa get pods
 No resources found in default namespace.
 ```
 
-Podを作成しようと試みる
+pod-saサービスアカウントでPodを作成しようと試みる
 
 ```sh
 kubectl --as=system:serviceaccount:default:pod-sa run nginx --image=nginx
@@ -1012,6 +1016,8 @@ Error from server (Forbidden): pods is forbidden: User "system:serviceaccount:de
 ```
 
 ### 2.clusterroleとclusterrolebinding(k8s-manage)
+
+![clusterroleとclusterrolebinding](images/011.jpg)
 
 #### 「namespace-sa」というServiceAccountを作成
 
@@ -1074,7 +1080,7 @@ namespace-clusterrole                                                  2022-03-0
 
 ServiceAccout namespace-saでは、defaultのNamespaceでNamespaceの一覧のみ取得が許可されているので、Namespaceを作成しようとするとエラーとなる。
 
-Namespaceの一覧を取得
+namespace-saサービスアカウントでNamespaceの一覧を取得
 
 ```sh
 kubectl --as=system:serviceaccount:default:namespace-sa get namespaces
@@ -1090,7 +1096,7 @@ kube-system        Active   4h18m
 tigera-operator    Active   4h16m
 ```
 
-Namespaceを作成しようと試みる
+namespace-saサービスアカウントでNamespaceを作成しようと試みる
 
 ```sh
 kubectl --as=system:serviceaccount:default:namespace-sa create namespace mynamespace
