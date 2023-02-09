@@ -830,6 +830,10 @@ kubectl logs kube-bench-master-64mwj
 ・
 ・（省略）
 ・
+[FAIL] 1.2.15 Ensure that the admission control plugin PodSecurityPolicy is set (Automated)
+・
+・（省略）
+・
 == Remediations master ==
 ・
 ・（省略）
