@@ -1292,7 +1292,7 @@ pod "hello-apparmor" deleted
 
 ## Seccomp
 
-![Seccomp](images/007.jpg)
+![Seccomp](images/008.jpg)
 
 ### 1.Nodeに接続して、seccompが有効か確認(k8s-node)
 
